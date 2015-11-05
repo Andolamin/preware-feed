@@ -1,0 +1,23 @@
+{
+	"name": "preware-feed",
+	"version": "0.0.1",
+	"description": "node.js based preware feed server for heroku.",
+	"homepage": "https://github.com/Andolamin/preware-feed",
+	"license": "Copyright 2015 Alan Stice",
+	"author": "Alan Stice <alan@alanstice.com> (http://alanstice.com)",
+	"maintainer": "Alan Stice <alan@alanstice.com> (http://alanstice.com)",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Andolamin/preware-feed.git"
+	},
+	"dependencies": {
+		"express": "4.13.3",
+		"pg": "4.4.3",
+		"pg-hstore": "2.3.2",
+		"sequelize": "3.13.0",
+		"body-parser": "1.14.1"
+	},
+	"engines": {
+		"node": "5.0.0"
+	}
+}
