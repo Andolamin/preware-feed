@@ -10,10 +10,11 @@
 	    crypto = require('crypto'),
 	    url = require('url'),
 	    https = require('https'),
+	    request = require('request'),
 	    i, server;
 
 	// Databases
-	var Package = db.define('package', {
+	var Package = db.define('packages', {
 	    Package: Sequelize.STRING,
 	    Size: Sequelize.INTEGER,
 	    Architecture: Sequelize.STRING,
@@ -28,30 +29,30 @@
 	    Feed: Sequelize.STRING
 	});
 
-	/** Source Keys
-	 * Title
-	 * Source
-	 * Location
-	 * LastUpdated
-	 * Feed
-	 * Type
-	 * Category
-	 * Homepage
-	 * Icon
-	 * FullDescription
-	 * Changelod
-	 * Screenshots
-	 * License
-	 * Price
-	 * PostInstallFlags
-	 * PostUpdateFlags
-	 * PostRemoveFlags
-	 * MinWebOSVersion
-	 * MaxWebOSVersion
-	 * DeviceCompatibility
-	 * Countries
-	 * Languages
-	 */
+	var Redirect = db.define('redirects', {
+	    Filename: Sequelize.STRING,
+	    Location: Sequelize.STRING,
+	    Feed: Sequelize.STRING
+	});
+
+	function addOrUpdateRedirect(filename, feed,location) {
+		Redirect
+			.findOrCreate({
+				where: {
+					Filename: filename,
+					Feed: feed
+				},
+				defaults: {
+					Location: location
+				}
+			})
+			.spread((redirect, created) => {
+				if (!created) {
+					redirect.Location = location;
+					redirect.save();
+				}
+			});
+	}
 
 	db.sync().then(() => {
 
@@ -81,14 +82,13 @@
 			// TODO: this code is fixed to testing/stable feeds. Try to make this more generic
 			server.post('/releaseHook', (req, res) => {
 				// Verify required fields
-				if (!req.body // Should be JSON
-				   || req.body.action !== "published" // Should be correct hook
-				   || !req.body.release // Should have a release
-				   || !req.body.repository // Should have a repository
-				   || !req.body.repository.name // Repository should have a name
-				   || !req.body.release.assets // Should have assets
-				   || req.body.release.assets.length !== 1 // Should have one asset
-				    ) {
+				if (!req.body || // Should be JSON
+				    req.body.action !== "published" || // Should be correct hook
+				    !req.body.release || // Should have a release
+				    !req.body.repository || // Should have a repository
+				    !req.body.repository.name || // Repository should have a name
+				    !req.body.release.assets || // Should have assets
+				    req.body.release.assets.length !== 1) { // Should have one asset
 					res.status(400).end();
 				} else {
 					Package.findOne({
@@ -118,7 +118,10 @@
 									pkg.Filename = req.body.release.assets[0].name;
 									pkg.Size = req.body.release.assets[0].size;
 									pkg.Version = req.body.release.tag_name;
-									pkg.Source.Location = req.body.release.assets[0].browser_download_url;
+									// pkg.Source.Location = req.body.release.assets[0].browser_download_url;
+
+									addOrUpdateRedirect(req.body.release.assets[0].name, (req.body.release.prerelease ? "testing" : "stable"), req.body.release.assets[0].browser_download_url);
+
 									pkg.Source.LastUpdated = "" + (Date.parse(req.body.release.published_at)/1000);
 									pkg.Source.Changelog = req.body.release.html_url;
 									pkg.save({
@@ -209,6 +212,21 @@
 					}
 
 					res.status(200).send(response);
+				});
+			});
+
+			server.get('/:feed/:file', (req, res) => {
+				Redirect.findOne({
+					where: {
+						Filename: req.params.file,
+						Feed: req.params.feed
+					}
+				}).then((redirect) => {
+					if (redirect === null) {
+						res.status(404).send("Cannot GET " + req.path);
+					} else {
+						request.get(redirect.Location).pipe(res);
+					}
 				});
 			});
 
