@@ -35,7 +35,7 @@
 	    Feed: Sequelize.STRING
 	});
 
-	function addOrUpdateRedirect(filename, feed,location) {
+	function addOrUpdateRedirect(filename, feed, location) {
 		Redirect
 			.findOrCreate({
 				where: {
@@ -91,10 +91,11 @@
 				    req.body.release.assets.length !== 1) { // Should have one asset
 					res.status(400).end();
 				} else {
+					var feed = req.body.release.tag_name.indexOf("alpha") >= 0 ? "alpha" : req.body.release.tag_name.indexOf("beta") >= 0 ? "beta" : "stable";
 					Package.findOne({
 						where: {
 							Package: req.body.repository.name,
-							Feed: req.body.release.prerelease ? "testing" : "stable"
+							Feed: feed 
 						}
 					}).then((pkg) => {
 						// Calculate the hash
@@ -120,7 +121,7 @@
 									pkg.Version = req.body.release.tag_name;
 									// pkg.Source.Location = req.body.release.assets[0].browser_download_url;
 
-									addOrUpdateRedirect(req.body.release.assets[0].name, (req.body.release.prerelease ? "testing" : "stable"), req.body.release.assets[0].browser_download_url);
+									addOrUpdateRedirect(req.body.release.assets[0].name, feed, req.body.release.assets[0].browser_download_url);
 
 									pkg.Source.LastUpdated = "" + (Date.parse(req.body.release.published_at)/1000);
 									pkg.Source.Changelog = req.body.release.html_url;
@@ -161,7 +162,21 @@
 						Description: body.Description,
 						MD5Sum: "",
 						Source: body.Source,
-						Feed: "testing"
+						Feed: "alpha"
+					});
+					Package.create({
+						Package: body.Package,
+						Size: 0,
+						Architecture: body.Architecture,
+						Section: body.Section,
+						Filename: "",
+						Depends: body.Depends,
+						Maintainer: body.Maintainer,
+						Version: body.Version,
+						Description: body.Description,
+						MD5Sum: "",
+						Source: body.Source,
+						Feed: "beta"
 					});
 					Package.create({
 						Package: body.Package,
