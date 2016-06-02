@@ -11,14 +11,14 @@
 		"url": "https://github.com/Andolamin/preware-feed.git"
 	},
 	"dependencies": {
-		"express": "4.13.3",
-		"pg": "4.4.3",
+		"express": "4.13.4",
+		"pg": "4.5.5",
 		"pg-hstore": "2.3.2",
-		"sequelize": "3.13.0",
-		"body-parser": "1.14.1",
-		"request": "2.65.0"
+		"sequelize": "3.23.3",
+		"body-parser": "1.15.1",
+		"request": "2.72.0"
 	},
 	"engines": {
-		"node": "5.0.0"
+		"node": "6.2.0"
 	}
 }
