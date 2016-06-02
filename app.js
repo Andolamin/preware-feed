@@ -35,6 +35,12 @@
 	    Feed: Sequelize.STRING
 	});
 
+	var feedTargets = {
+		"alpha": ["alpha"],
+		"beta": ["beta", "alpha"],
+		"stable": ["stable", "beta", "alpha"]
+	};
+
 	function addOrUpdateRedirect(filename, feed, location) {
 		Redirect
 			.findOrCreate({
@@ -91,55 +97,57 @@
 				    req.body.release.assets.length !== 1) { // Should have one asset
 					res.status(400).end();
 				} else {
-					var feed = req.body.release.tag_name.indexOf("alpha") >= 0 ? "alpha" : req.body.release.tag_name.indexOf("beta") >= 0 ? "beta" : "stable";
-					Package.findOne({
-						where: {
-							Package: req.body.repository.name,
-							Feed: feed 
-						}
-					}).then((pkg) => {
-						// Calculate the hash
-						var hash = crypto.createHash('md5');
+					var feeds = feedTargets[req.body.release.tag_name.indexOf("alpha") >= 0 ? "alpha" : req.body.release.tag_name.indexOf("beta") >= 0 ? "beta" : "stable"];
+					feeds.forEach(function (feed) {
+						Package.findOne({
+							where: {
+								Package: req.body.repository.name,
+								Feed: feed 
+							}
+						}).then((pkg) => {
+							// Calculate the hash
+							var hash = crypto.createHash('md5');
 
-						var parsedURL = url.parse(req.body.release.assets[0].browser_download_url);
+							var parsedURL = url.parse(req.body.release.assets[0].browser_download_url);
 
-						var options = {method: 'HEAD', host: parsedURL.host, port: 443, path: parsedURL.path};
+							var options = {method: 'HEAD', host: parsedURL.host, port: 443, path: parsedURL.path};
 
-						https.request(options, (response) => {
-							var newURL = url.parse(response.headers.location);
-							var newOptions = {method: 'GET', host: newURL.host, port: 443, path: newURL.path};
-							https.request(newOptions, (response) => {
-								response.on('data', (data) => {
-									hash.update(data);
-								});
+							https.request(options, (response) => {
+								var newURL = url.parse(response.headers.location);
+								var newOptions = {method: 'GET', host: newURL.host, port: 443, path: newURL.path};
+								https.request(newOptions, (response) => {
+									response.on('data', (data) => {
+										hash.update(data);
+									});
 
-								response.on('end', () => {
-									var MD5Sum = hash.digest('hex');
-									pkg.MD5Sum = MD5Sum;
-									pkg.Filename = req.body.release.assets[0].name;
-									pkg.Size = req.body.release.assets[0].size;
-									pkg.Version = req.body.release.tag_name;
-									// pkg.Source.Location = req.body.release.assets[0].browser_download_url;
+									response.on('end', () => {
+										var MD5Sum = hash.digest('hex');
+										pkg.MD5Sum = MD5Sum;
+										pkg.Filename = req.body.release.assets[0].name;
+										pkg.Size = req.body.release.assets[0].size;
+										pkg.Version = req.body.release.tag_name;
+										// pkg.Source.Location = req.body.release.assets[0].browser_download_url;
 
-									addOrUpdateRedirect(req.body.release.assets[0].name, feed, req.body.release.assets[0].browser_download_url);
+										addOrUpdateRedirect(req.body.release.assets[0].name, feed, req.body.release.assets[0].browser_download_url);
 
-									pkg.Source.LastUpdated = "" + (Date.parse(req.body.release.published_at)/1000);
-									pkg.Source.Changelog = req.body.release.html_url;
-									pkg.save({
-										fields: (pkg.changed() || []).concat(['Source'])
-									}).then(() => {
-										res.status(200).end();
-									}).catch(() => {
+										pkg.Source.LastUpdated = "" + (Date.parse(req.body.release.published_at)/1000);
+										pkg.Source.Changelog = req.body.release.html_url;
+										pkg.save({
+											fields: (pkg.changed() || []).concat(['Source'])
+										}).then(() => {
+											res.status(200).end();
+										}).catch(() => {
+											res.status(500).end();
+										});
+									})
+
+									response.on('error', () => {
 										res.status(500).end();
 									});
-								})
-
-								response.on('error', () => {
-									res.status(500).end();
-								});
+								}).end();
 							}).end();
-						}).end();
 
+						});
 					});
 				}
 			});
